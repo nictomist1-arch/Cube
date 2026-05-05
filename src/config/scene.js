@@ -5,4 +5,4 @@ export const SCENE_CONFIG = {
         color: 0x1E1036,
         density: 0.003
     }
-}
+};

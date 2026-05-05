@@ -1,57 +1,44 @@
 import * as THREE from 'three';
-
+        // создание сцены
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-	75,
-	window.innerWidth / window.innerHeight,
-	0.1,
-	1000
-);
+        // камера - угол наклона, расположение, размер экрана
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // отрисовка 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+camera.position.z = 5;
+scene.add(camera);
+        // освещение
+const spotLight = new THREE.SpotLight(0xffffff, 1);
+scene.add(spotLight);
+spotLight.position.set(15, 15, 10);
+const light = new THREE.AmbientLight(0x404040, 1);
+scene.add(light);
 
-const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.55);
-scene.add(hemisphereLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
-directionalLight.position.set(10, 14, 8);
-scene.add(directionalLight);
-
-const geometry = new THREE.BoxGeometry(5, 5, 5);
-const material = new THREE.MeshStandardMaterial({
-	color: 0x00ff00,
-	roughness: 0.45,
-	metalness: 0.15
-});
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
-
-const sphereGeometry = new THREE.SphereGeometry(3, 32, 32);
-const sphereMaterial = new THREE.MeshStandardMaterial({
-	color: 0x2194ce,
-	roughness: 0.35,
-	metalness: 0.2
-});
-const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-sphere.position.x = 8;
+const geometry = new THREE.SphereGeometry(1, 32, 32);
+const as = new THREE.MeshStandardMaterial({ color: 0x800080, roughness: 0.1, metalness: 0.8 });
+const sphere = new THREE.Mesh(geometry, as);
+sphere.position.x = -2; 
 scene.add(sphere);
 
-camera.position.z = 20;
+const cubes = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.5, metalness: 0.5});
+const cube = new THREE.Mesh(cubes, material);
+cube.position.y = 2; 
+scene.add(cube);
 
-function animate() {
-	requestAnimationFrame(animate);
-	const time = Date.now() * 0.001;
+camera.position.z = 5;
 
-	cube.position.x = Math.sin(time) * 5;
-	cube.position.y = Math.cos(time) * 1.5;
-	sphere.position.x = cube.position.x + 8;
-	sphere.position.y = cube.position.y;
-
-	cube.rotation.x += 0.01;
-	cube.rotation.y += 0.01;
-	sphere.rotation.y += 0.01;
-	renderer.render(scene, camera);
+function render(){
+    requestAnimationFrame(render);
+    cube.rotation.x += 0.01;
+    cube.rotation.y += 0.01;
+    
+    sphere.rotation.x += 0.01;
+    sphere.rotation.y += 0.01;
+    
+    renderer.render(scene, camera);
 }
-
-animate();
+render();

@@ -29,4 +29,8 @@ export class CameraManager {
 	getCamera() {
 		return this.camera;
 	}
+
+	getControls() {
+		return this.controls;
+	}
 }
