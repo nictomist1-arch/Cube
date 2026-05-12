@@ -8,5 +8,16 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nictomist1-arch/Cube.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nictomist1-arch/Cube/issues"
+  },
+  "homepage": "https://github.com/nictomist1-arch/Cube#readme",
+  "dependencies": {
+    "three": "^0.184.0"
+  }
 }
