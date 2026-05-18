@@ -23,21 +23,30 @@ const sphere = new THREE.Mesh(geometry, as);
 sphere.position.x = -2; 
 scene.add(sphere);
 
-const cubes = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.5, metalness: 0.5});
-const cube = new THREE.Mesh(cubes, material);
-cube.position.y = 2; 
-scene.add(cube);
+const cylinderGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+const material = new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 0.5, metalness: 0.5 });
+const cylinder = new THREE.Mesh(cylinderGeometry, material);
+cylinder.position.y = 2;
+scene.add(cylinder);
+
+const coneGeometry = new THREE.ConeGeometry(1, 2, 32);
+const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 0.5, metalness: 0.5 });
+const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+cone.position.x = 2;
+scene.add(cone);
 
 camera.position.z = 5;
 
 function render(){
     requestAnimationFrame(render);
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
+    cylinder.rotation.x += 0.01;
+    cylinder.rotation.y += 0.01;
     
     sphere.rotation.x += 0.01;
     sphere.rotation.y += 0.01;
+
+    cone.rotation.x += 0.01;
+    cone.rotation.y += 0.01;
     
     renderer.render(scene, camera);
 }

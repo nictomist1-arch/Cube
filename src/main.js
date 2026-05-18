@@ -3,6 +3,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {SceneManager} from './core/SceneManager.js';
 import {CameraManager} from './core/CameraManager.js';
 import {LightManager} from './core/LightManager.js';
+import {ShipGenerator} from './utils/ShipGenerator.js';
+import {PartsShip} from './utils/PartsShip.js';
+import {SkySettings} from './config/SkySettings.js';
 
 class Main{
     constructor(){
@@ -13,7 +16,8 @@ class Main{
         this.lightManager = null;
         this.controls = null;
         this.time = 0;
-        this.cube = null;
+        this.ship = null;
+        this.skySettings = null;
         this.init();
     }
     init(){
@@ -23,13 +27,18 @@ class Main{
         this.renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(this.renderer.domElement);
 
+        this.skySettings = new SkySettings();
+
         this.sceneManager = new SceneManager(this.renderer.domElement);
         const scene = this.sceneManager.create();
+        this.skySettings.addAnimatedSpheres( scene );
         new THREE.TextureLoader().load(
             'https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg',
-            (texture) => {
+            ( texture ) => {
+
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.background = texture;
+
             }
         );
         this.cameraManager = new CameraManager(this.renderer.domElement);
@@ -41,26 +50,38 @@ class Main{
         this.lightManager = new LightManager(scene);
         this.lightManager.createAll();
 
-        const geometry = new THREE.BoxGeometry(2, 2, 2);
-        const material = new THREE.MeshStandardMaterial({ color: 0x00ff88 });
-        this.cube = new THREE.Mesh(geometry, material);
-        this.cube.castShadow = true;
-        scene.add(this.cube);
+        this.ship = new ShipGenerator().createShip(
+            new PartsShip( { hull: 2, cabin: 2, engine: 2 } )
+        );
+        this.ship.position.set( 0, 0.5, 0 );
+        scene.add( this.ship );
 
         const grid = new THREE.GridHelper(10, 20, 0x00ff00, 0x00aa00);
         grid.position.y = -1;
         scene.add(grid);
+
+        window.addEventListener( 'resize', () => {
+
+            const cam = this.cameraManager.getCamera();
+            cam.aspect = window.innerWidth / window.innerHeight;
+            cam.updateProjectionMatrix();
+            this.renderer.setSize( window.innerWidth, window.innerHeight );
+
+        } );
     }
     animate(){
         requestAnimationFrame(() => this.animate());
         this.time += 0.016;
-        if (this.cube) {
-            this.cube.rotation.x += 0.01;
-            this.cube.rotation.y += 0.01;
+        if ( this.ship ) {
+
+            this.ship.rotation.y += 0.008;
+
         }
         if (this.controls) {
             this.controls.update();
         }
+
+        this.skySettings.updateSpheres();
 
         this.renderer.render(
             this.sceneManager.getScene(),
