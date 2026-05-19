@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import {SceneManager} from './core/SceneManager.js';
-import {CameraManager} from './core/CameraManager.js';
-import {LightManager} from './core/LightManager.js';
-import {ShipGenerator} from './utils/ShipGenerator.js';
-import {PartsShip} from './utils/PartsShip.js';
-import {SkySettings} from './config/SkySettings.js';
+import { SceneManager } from './core/SceneManager.js';
+import { CameraManager } from './core/CameraManager.js';
+import { LightManager } from './core/LightManager.js';
+import { ModelLoader } from './core/ModelLoader.js';
+import { ShipGenerator } from './utils/ShipGenerator.js';
+import { PartsShip } from './utils/PartsShip.js';
+import { SkySettings } from './config/SkySettings.js';
 
 class Main{
     constructor(){
@@ -29,7 +29,7 @@ class Main{
 
         this.skySettings = new SkySettings();
 
-        this.sceneManager = new SceneManager(this.renderer.domElement);
+        this.sceneManager = new SceneManager();
         const scene = this.sceneManager.create();
         this.skySettings.addAnimatedSpheres( scene );
         new THREE.TextureLoader().load(
@@ -41,16 +41,13 @@ class Main{
 
             }
         );
-        this.cameraManager = new CameraManager(this.renderer.domElement);
-        this.camera = this.cameraManager.create(window.innerWidth / window.innerHeight);
-        scene.add(this.camera);
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-        this.lightManager = new LightManager(scene);
+        this.cameraManager = new CameraManager( this.renderer.domElement );
+        this.camera = this.cameraManager.create( window.innerWidth / window.innerHeight );
+        this.cameraManager.createControls();
+        this.lightManager = new LightManager( scene );
         this.lightManager.createAll();
-        this.modelLoader = new this.ModelLoader(scene);
-        this.modelLoader.load(1);
+        this.modelLoader = new ModelLoader( scene );
+        this.modelLoader.load( 0 );
 
         this.ship = new ShipGenerator().createShip(
             new PartsShip( { hull: 2, cabin: 2, engine: 2 } )
@@ -64,9 +61,7 @@ class Main{
 
         window.addEventListener( 'resize', () => {
 
-            const cam = this.cameraManager.getCamera();
-            cam.aspect = window.innerWidth / window.innerHeight;
-            cam.updateProjectionMatrix();
+            this.cameraManager.onWindowResize();
             this.renderer.setSize( window.innerWidth, window.innerHeight );
 
         } );
@@ -79,9 +74,7 @@ class Main{
             this.ship.rotation.y += 0.008;
 
         }
-        if (this.controls) {
-            this.controls.update();
-        }
+        this.cameraManager.update();
 
         this.skySettings.updateSpheres();
 

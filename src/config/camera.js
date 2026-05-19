@@ -9,7 +9,8 @@ export const CAMERA_CONFIG = {
 		enableDamping: true,
 		dampingFactor: 0.1,
 		autoRotate: false,
-		enableZoom: false,
+		enableZoom: true,
+		zoomSpeed: 1,
 		enablePan: true,
 		rotateSpeed: 0.5
 	}
