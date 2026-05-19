@@ -49,6 +49,8 @@ class Main{
         this.controls.dampingFactor = 0.05;
         this.lightManager = new LightManager(scene);
         this.lightManager.createAll();
+        this.modelLoader = new this.ModelLoader(scene);
+        this.modelLoader.load(1);
 
         this.ship = new ShipGenerator().createShip(
             new PartsShip( { hull: 2, cabin: 2, engine: 2 } )
