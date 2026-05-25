@@ -7,6 +7,8 @@ import { SphereObject } from './core/SphereObject.js';
 import { SkySettings } from './config/SkySettings.js';
 import { TEXTURES_CONFIG } from './config/texture.js';
 import { TweakpaneUI, createDefaultParams } from './ui/TweakpaneUI.js';
+import { LensflareMode } from './modes/LensflareMode.js';
+import { SceneModeManager } from './modes/SceneModeManager.js';
 
 class Main {
 
@@ -18,18 +20,21 @@ class Main {
 		this.camera = null;
 		this.lightManager = null;
 		this.controls = null;
-		this.time = 0;
+		this.clock = new THREE.Clock();
 		this.sphere = null;
 		this.skySettings = null;
 		this.params = null;
 		this.ui = null;
+		this.grid = null;
+		this.sceneModeManager = null;
+		this.lensflareMode = null;
 		this.init();
 
 	}
 
 	init() {
 
-		this.renderer = new THREE.WebGLRenderer();
+		this.renderer = new THREE.WebGLRenderer( { antialias: true } );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.setPixelRatio( window.devicePixelRatio );
@@ -51,6 +56,7 @@ class Main {
 
 				this.skySettings.addAnimatedSpheres( scene, cubeTexture );
 				this.textureLoader.applyEnvMapTo( this.sphere );
+				this._registerDefaultVisibility();
 
 			},
 			onSphereBarkLoad: ( maps ) => {
@@ -82,11 +88,24 @@ class Main {
 				this.textureLoader.applyEnvMapTo( this.sphere );
 
 			},
+			onModeToggle: () => this.sceneModeManager?.toggle(),
 		} );
 
-		const grid = new THREE.GridHelper( 10, 20, 0x00ff00, 0x00aa00 );
-		grid.position.y = -1;
-		scene.add( grid );
+		this.grid = new THREE.GridHelper( 10, 20, 0x00ff00, 0x00aa00 );
+		this.grid.position.y = -1;
+		scene.add( this.grid );
+
+		this.lensflareMode = new LensflareMode( scene );
+
+		this.sceneModeManager = new SceneModeManager( {
+			scene,
+			cameraManager: this.cameraManager,
+			lensflareMode: this.lensflareMode,
+			defaultVisibility: [],
+		} );
+
+		this._registerDefaultVisibility();
+		this._bindModeSwitch();
 
 		window.addEventListener( 'resize', () => {
 
@@ -94,6 +113,60 @@ class Main {
 			this.renderer.setSize( window.innerWidth, window.innerHeight );
 
 		} );
+
+	}
+
+	_registerDefaultVisibility() {
+
+		const scene = this.sceneManager.getScene();
+		const hemiHelper = this.lightManager.getHelper( 'hemisphere' );
+
+		this.sceneModeManager.defaultVisibility = [
+			{ object: this.sphere },
+			{ object: this.grid },
+			{ object: this.skySettings.stars },
+			{ object: this.skySettings._root },
+			{ object: this.lightManager.getLight( 'hemisphere' ) },
+			{ object: this.lightManager.getLight( 'main' ) },
+			{ object: hemiHelper },
+		].filter( ( item ) => item.object );
+
+	}
+
+	_bindModeSwitch() {
+
+		const hint = document.getElementById( 'mode-hint' );
+
+		window.addEventListener( 'keydown', ( event ) => {
+
+			if ( event.code === 'KeyM' || event.code === 'Tab' ) {
+
+				event.preventDefault();
+				this.sceneModeManager.toggle();
+
+			}
+
+		} );
+
+		this.sceneModeManager.onModeChange = ( mode ) => {
+
+			this.ui?.setSceneMode( mode );
+
+			if ( hint ) {
+
+				hint.textContent = mode === 'lensflare'
+					? 'Режим: Lens Flares — WASD/RF/QE + мышь. M или Tab — обратно'
+					: 'Режим: сцена со сферой. M или Tab — Lens Flares + полёт';
+
+			}
+
+		};
+
+		if ( hint ) {
+
+			hint.textContent = 'Режим: сцена со сферой. M или Tab — Lens Flares + полёт';
+
+		}
 
 	}
 
@@ -118,21 +191,30 @@ class Main {
 
 		}
 
+		this._registerDefaultVisibility();
+
 	}
 
 	animate() {
 
 		requestAnimationFrame( () => this.animate() );
-		this.time += 0.016;
 
-		if ( this.sphere ) {
+		const delta = this.clock.getDelta();
+		const isLensflare = this.sceneModeManager?.isLensflare();
+
+		if ( ! isLensflare && this.sphere ) {
 
 			this.sphere.rotation.y += this.params?.rotationSpeed ?? 0.004;
 
 		}
 
-		this.cameraManager.update();
-		this.skySettings.updateSpheres();
+		if ( ! isLensflare ) {
+
+			this.skySettings.updateSpheres();
+
+		}
+
+		this.cameraManager.update( delta );
 
 		this.renderer.render(
 			this.sceneManager.getScene(),

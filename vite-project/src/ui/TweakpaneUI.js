@@ -32,6 +32,28 @@ export class TweakpaneUI {
 		this._buildSphereFolder();
 		this._buildLightsFolder();
 		this._buildSceneFolder();
+		this._buildModeFolder( options.onModeToggle );
+		this.sceneMode = 'default';
+
+	}
+
+	setSceneMode( mode ) {
+
+		this.sceneMode = mode;
+
+		if ( this.modeBinding ) {
+
+			this.modeBinding.title = mode === 'lensflare'
+				? 'Переключить: сфера'
+				: 'Переключить: Lens Flares';
+
+		}
+
+		if ( this.sphereFolder ) {
+
+			this.sphereFolder.hidden = mode === 'lensflare';
+
+		}
 
 	}
 
@@ -45,9 +67,26 @@ export class TweakpaneUI {
 
 	}
 
+	_buildModeFolder( onModeToggle ) {
+
+		const folder = this.pane.addFolder( { title: 'Режим', expanded: true } );
+
+		this.modeBinding = folder.addButton( {
+			title: 'Сфера + Orbit',
+		} );
+
+		this.modeBinding.on( 'click', () => {
+
+			if ( onModeToggle ) onModeToggle();
+
+		} );
+
+	}
+
 	_buildSphereFolder() {
 
 		const folder = this.pane.addFolder( { title: 'Сфера', expanded: true } );
+		this.sphereFolder = folder;
 
 		folder.addBinding( this.params, 'rotationSpeed', {
 			label: 'вращение',

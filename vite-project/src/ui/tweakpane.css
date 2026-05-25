@@ -16,3 +16,19 @@
 	max-width: min(100%, 360px);
 	width: 100%;
 }
+
+#mode-hint {
+	position: fixed;
+	bottom: 16px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 999;
+	padding: 8px 14px;
+	border-radius: 6px;
+	background: rgba(0, 0, 0, 0.65);
+	color: #e8e8ff;
+	font: 13px/1.4 system-ui, sans-serif;
+	text-align: center;
+	pointer-events: none;
+	max-width: 90vw;
+}
