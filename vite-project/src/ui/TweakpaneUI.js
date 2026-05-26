@@ -15,6 +15,7 @@ export class TweakpaneUI {
 			getSphere,
 			lightManager,
 			onEnvMapIntensityChange,
+			onControlModeToggle,
 		} = options;
 
 		this.params = params;
@@ -29,29 +30,23 @@ export class TweakpaneUI {
 			container: container ?? undefined,
 			expanded: true,
 		} );
+		this._buildControlModeFolder( onControlModeToggle );
 		this._buildSphereFolder();
 		this._buildLightsFolder();
 		this._buildSceneFolder();
-		this._buildModeFolder( options.onModeToggle );
-		this.sceneMode = 'default';
+		this.controlMode = 'orbit';
 
 	}
 
-	setSceneMode( mode ) {
+	setControlMode( mode ) {
 
-		this.sceneMode = mode;
+		this.controlMode = mode;
 
 		if ( this.modeBinding ) {
 
-			this.modeBinding.title = mode === 'lensflare'
-				? 'Переключить: сфера'
-				: 'Переключить: Lens Flares';
-
-		}
-
-		if ( this.sphereFolder ) {
-
-			this.sphereFolder.hidden = mode === 'lensflare';
+			this.modeBinding.title = mode === 'fly'
+				? 'Переключить: орбита'
+				: 'Переключить: полёт';
 
 		}
 
@@ -67,17 +62,17 @@ export class TweakpaneUI {
 
 	}
 
-	_buildModeFolder( onModeToggle ) {
+	_buildControlModeFolder( onControlModeToggle ) {
 
-		const folder = this.pane.addFolder( { title: 'Режим', expanded: true } );
+		const folder = this.pane.addFolder( { title: 'Камера', expanded: true } );
 
 		this.modeBinding = folder.addButton( {
-			title: 'Сфера + Orbit',
+			title: 'Переключить: полёт',
 		} );
 
 		this.modeBinding.on( 'click', () => {
 
-			if ( onModeToggle ) onModeToggle();
+			if ( onControlModeToggle ) onControlModeToggle();
 
 		} );
 
@@ -86,7 +81,6 @@ export class TweakpaneUI {
 	_buildSphereFolder() {
 
 		const folder = this.pane.addFolder( { title: 'Сфера', expanded: true } );
-		this.sphereFolder = folder;
 
 		folder.addBinding( this.params, 'rotationSpeed', {
 			label: 'вращение',

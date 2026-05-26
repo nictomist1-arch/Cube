@@ -3,8 +3,6 @@ import { SPHERE_CONFIG } from '../config/sphere.js';
 import { createStandardMaterial } from '../utils/TextureMaterials.js';
 
 /**
- * Сфера с диффузной текстурой (примеры three.js).
- *
  * @see https://threejs.org/docs/#api/en/geometries/SphereGeometry
  */
 export class SphereObject {

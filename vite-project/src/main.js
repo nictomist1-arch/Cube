@@ -4,11 +4,11 @@ import { CameraManager } from './core/CameraManager.js';
 import { LightManager } from './core/LightManager.js';
 import { TextureLoader } from './core/TextureLoader.js';
 import { SphereObject } from './core/SphereObject.js';
+import { PlayerShip } from './core/PlayerShip.js';
+import { Asteroid } from './core/Asteroid.js';
 import { SkySettings } from './config/SkySettings.js';
 import { TEXTURES_CONFIG } from './config/texture.js';
 import { TweakpaneUI, createDefaultParams } from './ui/TweakpaneUI.js';
-import { LensflareMode } from './modes/LensflareMode.js';
-import { SceneModeManager } from './modes/SceneModeManager.js';
 
 class Main {
 
@@ -25,9 +25,17 @@ class Main {
 		this.skySettings = null;
 		this.params = null;
 		this.ui = null;
-		this.grid = null;
-		this.sceneModeManager = null;
-		this.lensflareMode = null;
+		this.playerShip = null;
+		this.asteroid = null;
+		this.impactFlash = 0;
+		this.shipKeys = {
+			forward: false,
+			back: false,
+			left: false,
+			right: false,
+			up: false,
+			down: false,
+		};
 		this.init();
 
 	}
@@ -56,7 +64,17 @@ class Main {
 
 				this.skySettings.addAnimatedSpheres( scene, cubeTexture );
 				this.textureLoader.applyEnvMapTo( this.sphere );
-				this._registerDefaultVisibility();
+				if ( this.playerShip?.loaded ) {
+
+					this.textureLoader.applyEnvMapTo( this.playerShip.getObject() );
+
+				}
+
+				if ( this.asteroid?.loaded ) {
+
+					this.textureLoader.applyEnvMapTo( this.asteroid.getObject() );
+
+				}
 
 			},
 			onSphereBarkLoad: ( maps ) => {
@@ -66,9 +84,34 @@ class Main {
 			},
 		} );
 
-		this.cameraManager = new CameraManager( this.renderer.domElement );
+		this.cameraManager = new CameraManager( this.renderer.domElement, scene );
 		this.camera = this.cameraManager.create( window.innerWidth / window.innerHeight );
 		this.cameraManager.createControls();
+
+		this.playerShip = new PlayerShip();
+		this.playerShip.load( scene ).then( () => {
+
+			this.cameraManager.setPlayerShip( this.playerShip );
+			this.textureLoader.applyEnvMapTo( this.playerShip.getObject() );
+
+		} ).catch( ( err ) => {
+
+			console.error( 'Не удалось загрузить scout.glb:', err );
+
+		} );
+
+		this.asteroid = new Asteroid();
+		this.asteroid.load( scene ).then( () => {
+
+			this.textureLoader.applyEnvMapTo( this.asteroid.getObject() );
+
+		} ).catch( ( err ) => {
+
+			console.error( 'Не удалось загрузить asteroid2.glb:', err );
+			console.info( 'Положите модель в public/models/asteroid2.glb' );
+
+		} );
+
 		this.lightManager = new LightManager( scene );
 		this.lightManager.createAll();
 
@@ -88,24 +131,15 @@ class Main {
 				this.textureLoader.applyEnvMapTo( this.sphere );
 
 			},
-			onModeToggle: () => this.sceneModeManager?.toggle(),
+			onControlModeToggle: () => this._toggleControlMode(),
 		} );
 
-		this.grid = new THREE.GridHelper( 10, 20, 0x00ff00, 0x00aa00 );
-		this.grid.position.y = -1;
-		scene.add( this.grid );
+		const grid = new THREE.GridHelper( 10, 20, 0x00ff00, 0x00aa00 );
+		grid.position.y = -1;
+		scene.add( grid );
 
-		this.lensflareMode = new LensflareMode( scene );
-
-		this.sceneModeManager = new SceneModeManager( {
-			scene,
-			cameraManager: this.cameraManager,
-			lensflareMode: this.lensflareMode,
-			defaultVisibility: [],
-		} );
-
-		this._registerDefaultVisibility();
-		this._bindModeSwitch();
+		this._bindControlModeSwitch();
+		this._bindFlyShipControls();
 
 		window.addEventListener( 'resize', () => {
 
@@ -116,55 +150,132 @@ class Main {
 
 	}
 
-	_registerDefaultVisibility() {
+	_toggleControlMode() {
 
-		const scene = this.sceneManager.getScene();
-		const hemiHelper = this.lightManager.getHelper( 'hemisphere' );
-
-		this.sceneModeManager.defaultVisibility = [
-			{ object: this.sphere },
-			{ object: this.grid },
-			{ object: this.skySettings.stars },
-			{ object: this.skySettings._root },
-			{ object: this.lightManager.getLight( 'hemisphere' ) },
-			{ object: this.lightManager.getLight( 'main' ) },
-			{ object: hemiHelper },
-		].filter( ( item ) => item.object );
+		this.cameraManager.toggleControlMode();
+		this._clearShipKeys();
+		this._updateControlModeHint();
 
 	}
 
-	_bindModeSwitch() {
+	_clearShipKeys() {
 
-		const hint = document.getElementById( 'mode-hint' );
+		for ( const key of Object.keys( this.shipKeys ) ) {
+
+			this.shipKeys[ key ] = false;
+
+		}
+
+		this.playerShip?.setKeys( this.shipKeys );
+
+	}
+
+	_bindControlModeSwitch() {
 
 		window.addEventListener( 'keydown', ( event ) => {
 
 			if ( event.code === 'KeyM' || event.code === 'Tab' ) {
 
 				event.preventDefault();
-				this.sceneModeManager.toggle();
+				this._toggleControlMode();
 
 			}
 
 		} );
 
-		this.sceneModeManager.onModeChange = ( mode ) => {
+		this._updateControlModeHint();
 
-			this.ui?.setSceneMode( mode );
+	}
 
-			if ( hint ) {
+	_updateControlModeHint() {
 
-				hint.textContent = mode === 'lensflare'
-					? 'Режим: Lens Flares — WASD/RF/QE + мышь. M или Tab — обратно'
-					: 'Режим: сцена со сферой. M или Tab — Lens Flares + полёт';
+		const hint = document.getElementById( 'mode-hint' );
+		const isFly = this.cameraManager.isFlyMode();
 
-			}
+		this.ui?.setControlMode( isFly ? 'fly' : 'orbit' );
+
+		if ( ! hint ) return;
+
+		hint.textContent = isFly
+			? 'Режим: полёт за scout — WASD/стрелки, R/F, ЛКМ+мышь. M или Tab — орбита'
+			: 'Режим: орбита — мышь + колёсико. M или Tab — полёт за кораблём';
+
+	}
+
+	_bindFlyShipControls() {
+
+		const keyMap = {
+			KeyW: 'forward',
+			KeyS: 'back',
+			KeyA: 'left',
+			KeyD: 'right',
+			KeyR: 'up',
+			KeyF: 'down',
+			ArrowUp: 'forward',
+			ArrowDown: 'back',
+			ArrowLeft: 'left',
+			ArrowRight: 'right',
+		};
+
+		const setKey = ( code, pressed ) => {
+
+			if ( ! this.cameraManager?.isFlyMode() ) return;
+
+			const prop = keyMap[ code ];
+			if ( ! prop ) return;
+			this.shipKeys[ prop ] = pressed;
+			this.playerShip?.setKeys( this.shipKeys );
 
 		};
 
-		if ( hint ) {
+		window.addEventListener( 'keydown', ( event ) => {
 
-			hint.textContent = 'Режим: сцена со сферой. M или Tab — Lens Flares + полёт';
+			if ( event.repeat || ! this.cameraManager?.isFlyMode() ) return;
+			setKey( event.code, true );
+
+		} );
+
+		window.addEventListener( 'keyup', ( event ) => {
+
+			if ( ! this.cameraManager?.isFlyMode() ) return;
+			setKey( event.code, false );
+
+		} );
+
+	}
+
+	_onAsteroidHitSphere() {
+
+		this.impactFlash = 1;
+
+	}
+
+	_updateImpactFlash( delta ) {
+
+		if ( ! this.sphere?.material ) return;
+
+		const material = this.sphere.material;
+
+		if ( this.impactFlash <= 0 ) {
+
+			if ( material.emissive ) {
+
+				material.emissive.setHex( 0x000000 );
+				material.emissiveIntensity = 0;
+
+			}
+
+			return;
+
+		}
+
+		this.impactFlash = Math.max( 0, this.impactFlash - delta * 2.5 );
+		const strength = this.impactFlash * 0.35;
+
+		if ( material.emissive ) {
+
+			material.emissive.setRGB( strength, strength * 0.35, 0 );
+			material.emissiveIntensity = strength;
 
 		}
 
@@ -191,8 +302,6 @@ class Main {
 
 		}
 
-		this._registerDefaultVisibility();
-
 	}
 
 	animate() {
@@ -200,21 +309,24 @@ class Main {
 		requestAnimationFrame( () => this.animate() );
 
 		const delta = this.clock.getDelta();
-		const isLensflare = this.sceneModeManager?.isLensflare();
 
-		if ( ! isLensflare && this.sphere ) {
+		if ( this.sphere ) {
 
 			this.sphere.rotation.y += this.params?.rotationSpeed ?? 0.004;
 
 		}
 
-		if ( ! isLensflare ) {
+		if ( this.cameraManager.isFlyMode() ) {
 
-			this.skySettings.updateSpheres();
+			this.playerShip?.setKeys( this.shipKeys );
 
 		}
 
+		this.asteroid?.update( delta, () => this._onAsteroidHitSphere() );
+		this._updateImpactFlash( delta );
+
 		this.cameraManager.update( delta );
+		this.skySettings.updateSpheres();
 
 		this.renderer.render(
 			this.sceneManager.getScene(),

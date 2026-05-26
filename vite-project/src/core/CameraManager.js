@@ -1,17 +1,27 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import { CAMERA_CONFIG } from '../config/camera.js';
-import { LENSFLARE_CONFIG } from '../config/lensflare.js';
+
+const _lookAt = new THREE.Vector3();
+const _smoothLookAt = new THREE.Vector3();
+const _desiredPos = new THREE.Vector3();
+const _behind = new THREE.Vector3();
 
 export class CameraManager {
 
-	constructor( renderDomElement ) {
+	constructor( renderDomElement, scene ) {
 
 		this.camera = null;
 		this.controls = null;
 		this.renderDomElement = renderDomElement;
+		this.scene = scene;
 		this.controlMode = 'orbit';
+		this.playerShip = null;
+		this._flyLookActive = false;
+		this._onFlyPointerDown = null;
+		this._onFlyPointerUp = null;
+		this._onFlyPointerMove = null;
+		this._chaseInitialized = false;
 
 	}
 
@@ -36,6 +46,12 @@ export class CameraManager {
 			CAMERA_CONFIG.target.z
 		);
 
+		_smoothLookAt.set(
+			CAMERA_CONFIG.target.x,
+			CAMERA_CONFIG.target.y,
+			CAMERA_CONFIG.target.z
+		);
+
 		return this.camera;
 
 	}
@@ -46,7 +62,24 @@ export class CameraManager {
 
 	}
 
+	setPlayerShip( playerShip ) {
+
+		this.playerShip = playerShip;
+		this._updateShipVisibility();
+
+	}
+
+	_updateShipVisibility() {
+
+		if ( ! this.playerShip?.loaded ) return;
+
+		this.playerShip.setVisible( this.controlMode === 'fly' );
+
+	}
+
 	_disposeControls() {
+
+		this._unbindFlyLook();
 
 		if ( this.controls ) {
 
@@ -57,30 +90,123 @@ export class CameraManager {
 
 	}
 
+	_bindFlyLook() {
+
+		if ( this._onFlyPointerDown || ! this.playerShip?.loaded ) return;
+
+		const dom = this.renderDomElement;
+
+		this._onFlyPointerDown = ( event ) => {
+
+			if ( event.button !== 0 ) return;
+
+			this._flyLookActive = true;
+			dom.setPointerCapture( event.pointerId );
+
+		};
+
+		this._onFlyPointerUp = ( event ) => {
+
+			this._flyLookActive = false;
+
+			if ( dom.hasPointerCapture( event.pointerId ) ) {
+
+				dom.releasePointerCapture( event.pointerId );
+
+			}
+
+		};
+
+		this._onFlyPointerMove = ( event ) => {
+
+			if ( ! this._flyLookActive ) return;
+
+			this.playerShip.applyFlyLook( event.movementX, event.movementY );
+
+		};
+
+		dom.addEventListener( 'pointerdown', this._onFlyPointerDown );
+		dom.addEventListener( 'pointerup', this._onFlyPointerUp );
+		dom.addEventListener( 'pointercancel', this._onFlyPointerUp );
+		dom.addEventListener( 'pointermove', this._onFlyPointerMove );
+
+	}
+
+	_unbindFlyLook() {
+
+		if ( ! this._onFlyPointerDown ) return;
+
+		const dom = this.renderDomElement;
+
+		dom.removeEventListener( 'pointerdown', this._onFlyPointerDown );
+		dom.removeEventListener( 'pointerup', this._onFlyPointerUp );
+		dom.removeEventListener( 'pointercancel', this._onFlyPointerUp );
+		dom.removeEventListener( 'pointermove', this._onFlyPointerMove );
+
+		this._onFlyPointerDown = null;
+		this._onFlyPointerUp = null;
+		this._onFlyPointerMove = null;
+		this._flyLookActive = false;
+
+	}
+
+	_initFlyChaseCamera() {
+
+		if ( ! this.playerShip?.loaded ) return;
+
+		const chase = CAMERA_CONFIG.fly.chase;
+
+		this.playerShip.getChaseLookAt( _smoothLookAt );
+
+		_behind.set( 0, chase.height, chase.distance );
+		_behind.applyQuaternion( this.playerShip.getObject().quaternion );
+
+		this.camera.position.copy( this.playerShip.getPosition() ).add( _behind );
+		this.camera.lookAt( _smoothLookAt );
+		this._chaseInitialized = true;
+
+	}
+
+	_updateFlyChaseCamera( delta ) {
+
+		if ( ! this.playerShip?.loaded ) return;
+
+		const chase = CAMERA_CONFIG.fly.chase;
+		const ship = this.playerShip.getObject();
+
+		this.playerShip.getChaseLookAt( _lookAt );
+
+		_behind.set( 0, chase.height, chase.distance );
+		_behind.applyQuaternion( ship.quaternion );
+		_desiredPos.copy( ship.position ).add( _behind );
+
+		const posT = 1 - Math.exp( -chase.positionSmoothing * 60 * delta );
+		const lookT = 1 - Math.exp( -chase.lookSmoothing * 60 * delta );
+
+		this.camera.position.lerp( _desiredPos, posT );
+		_smoothLookAt.lerp( _lookAt, lookT );
+		this.camera.lookAt( _smoothLookAt );
+
+	}
+
 	switchToOrbit() {
 
 		this._disposeControls();
-
 		this.controlMode = 'orbit';
+		this._chaseInitialized = false;
+		this._updateShipVisibility();
+		this.renderDomElement.style.cursor = '';
 
-		this.camera.fov = CAMERA_CONFIG.fov;
-		this.camera.near = CAMERA_CONFIG.near;
-		this.camera.far = CAMERA_CONFIG.far;
-		this.camera.position.set(
-			CAMERA_CONFIG.position.x,
-			CAMERA_CONFIG.position.y,
-			CAMERA_CONFIG.position.z,
-		);
-		this.camera.updateProjectionMatrix();
+		const orbit = CAMERA_CONFIG.orbit;
 
 		this.controls = new OrbitControls( this.camera, this.renderDomElement );
-		this.controls.enablePan = CAMERA_CONFIG.controls.enablePan;
-		this.controls.enableDamping = CAMERA_CONFIG.controls.enableDamping;
-		this.controls.enableZoom = CAMERA_CONFIG.controls.enableZoom;
-		this.controls.dampingFactor = CAMERA_CONFIG.controls.dampingFactor;
-		this.controls.autoRotate = CAMERA_CONFIG.controls.autoRotate;
-		this.controls.rotateSpeed = CAMERA_CONFIG.controls.rotateSpeed;
-		this.controls.zoomSpeed = CAMERA_CONFIG.controls.zoomSpeed;
+		this.controls.enablePan = orbit.enablePan;
+		this.controls.enableDamping = orbit.enableDamping;
+		this.controls.enableZoom = orbit.enableZoom;
+		this.controls.dampingFactor = orbit.dampingFactor;
+		this.controls.autoRotate = orbit.autoRotate;
+		this.controls.rotateSpeed = orbit.rotateSpeed;
+		this.controls.zoomSpeed = orbit.zoomSpeed;
 		this.controls.target.set(
 			CAMERA_CONFIG.target.x,
 			CAMERA_CONFIG.target.y,
@@ -94,25 +220,42 @@ export class CameraManager {
 	switchToFly() {
 
 		this._disposeControls();
-
 		this.controlMode = 'fly';
+		this._updateShipVisibility();
+		this.renderDomElement.style.cursor = 'crosshair';
 
-		const cfg = LENSFLARE_CONFIG.camera;
-		const ctrl = LENSFLARE_CONFIG.controls;
+		this._bindFlyLook();
+		this._initFlyChaseCamera();
 
-		this.camera.fov = cfg.fov;
-		this.camera.near = cfg.near;
-		this.camera.far = cfg.far;
-		this.camera.position.set( cfg.position.x, cfg.position.y, cfg.position.z );
-		this.camera.updateProjectionMatrix();
+		return null;
 
-		this.controls = new FlyControls( this.camera, this.renderDomElement );
-		this.controls.movementSpeed = ctrl.movementSpeed;
-		this.controls.rollSpeed = ctrl.rollSpeed;
-		this.controls.autoForward = ctrl.autoForward;
-		this.controls.dragToLook = ctrl.dragToLook;
+	}
 
-		return this.controls;
+	toggleControlMode() {
+
+		if ( this.controlMode === 'orbit' ) {
+
+			this.switchToFly();
+
+		} else {
+
+			this.switchToOrbit();
+
+		}
+
+		return this.controlMode;
+
+	}
+
+	isFlyMode() {
+
+		return this.controlMode === 'fly';
+
+	}
+
+	isOrbitMode() {
+
+		return this.controlMode === 'orbit';
 
 	}
 
@@ -125,17 +268,17 @@ export class CameraManager {
 
 	update( delta ) {
 
-		if ( ! this.controls ) return;
+		if ( this.controlMode === 'fly' && this.playerShip?.loaded ) {
 
-		if ( this.controlMode === 'fly' ) {
-
-			this.controls.update( delta );
-
-		} else {
-
-			this.controls.update();
+			this.playerShip.updateFly( delta );
+			this._updateFlyChaseCamera( delta );
+			return;
 
 		}
+
+		if ( ! this.controls ) return;
+
+		this.controls.update();
 
 	}
 
@@ -151,9 +294,9 @@ export class CameraManager {
 
 	}
 
-	isFlyMode() {
+	getControlMode() {
 
-		return this.controlMode === 'fly';
+		return this.controlMode;
 
 	}
 
